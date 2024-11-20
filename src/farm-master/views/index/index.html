@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <title>Document</title>
+</head>
+<body>
+    <h1>Hao!</h1>
+    <p id="info"></p>
+    <h1>Upload a File</h1> 
+    <form id="uploadForm" enctype="multipart/form-data"> 
+        <input type="file" id="blender-file-uploader"> 
+        <input type="button" value="Upload" id="submit">
+    </form>
+    <script>
+        $('#submit').click(function(){
+            var files = $('#blender-file-uploader').prop('files');
+            console.log(files);
+            
+            var data = new FormData();
+            data.append('blender_file', files[0]);
+            $.ajax({
+                'url': '/api/upload',
+                'type': 'POST',
+                'data': data,
+                'cache': false,
+                'processData': false,
+                'contentType': false                
+            });
+        });
+        // setInterval(function(){
+        //     $.get('/api/get-info', function(data) {
+        //         var res = $('#info').text(data) 
+        //         console.log(res)
+        //     }).data
+        // }, 500)
+        // 
+        function UploadBlenderFile() {
+
+        }
+    </script>
+</body>
+</html>
