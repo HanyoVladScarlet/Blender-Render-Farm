@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 
 blender_files/
+blend.zip
+blend/

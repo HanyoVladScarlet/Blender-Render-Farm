@@ -1,6 +1,8 @@
-from repositories.task_repository import TaskDispatcher
 from utils.singleton import Singleton
 from datetime import datetime as dt
+from time import time as t_time
+from utils.ticker import Ticker
+from models.render_worker import BlenderWorker
 
 ILLEGAL_INFO_WARNING = 'Unsupported info sheet, ILLEGAL!'
 ILLEGAL_WORKER_WARNING = 'Unregistered worker, ILLEGAL!'
@@ -12,7 +14,6 @@ class WorkerUnion():
     Use this repository for worker register.
     '''
     def __init__(self):
-        self.td = TaskDispatcher()
         '''
         Worker map is used for register worker with their device info, task history, and current status.
         {
@@ -22,7 +23,16 @@ class WorkerUnion():
             "task_history": { ... }
         }
         '''
-        self.worker_map = {}
+        self.worker_list = []
+        self.timeout = 10
+        Ticker().register(self)
+
+
+    def tick(self):
+        for worker_name in self.worker_list:
+            if t_time() - self.worker_list[worker_name]['last_alive'] > self.timeout:
+                self.worker_list[worker_name]['status'] = 2
+        return
 
     def add_one_worker(self, data):
         '''
@@ -41,17 +51,15 @@ class WorkerUnion():
             }
         }
         '''
-        if 'worker_name' not in data.keys():
+        if 'worker_name' not in data:
             print(ILLEGAL_INFO_WARNING)
             return    
-        worker_name = data['worker_name']
-        worker_item = {
-            'status': data['worker_status'],
-            'last_alive': dt.now().timestamp(),
-            'device_info': data['device_info'],
-            'task_history': {}
-        }
-        self.worker_map[worker_name] = worker_item
+        worker = BlenderWorker()
+        worker.name = data['worker_name']
+        worker.is_busy = False,
+        worker.last_alive = dt.now().timestamp()
+        worker.device_info = data['qpu-status']
+        self.worker_list.append(worker)
         return
 
 
@@ -59,9 +67,15 @@ class WorkerUnion():
         '''
         Get one worker by name.
         '''
-        if worker_name in self.worker_map.keys():
-            return self.worker_map[worker_name]
+        if worker_name in [w.name for w in self.worker_list]:
+            return self.worker_list[worker_name]
         return 
+    
+    def is_worker_alive(self, worker_name):
+        '''
+        Find out is a worker alive.
+        '''
+        return worker_name not in self.worker_list or self.worker_list[worker_name]['status'] < 2
     
     def get_one_task(self, worker_name):
         if not self.td.any_available_task():
@@ -69,9 +83,18 @@ class WorkerUnion():
         res = self.td.get_one_task(worker_name)
         return res
 
-    def update_one_status(self, worker_name, status):
-        if worker_name not in self.worker_map.keys():
-            return ILLEGAL_WORKER_WARNING
-        self.worker_map[worker_name]['status'] = status
-        self.worker_map[worker_name]['last_alive'] = dt.now().timestamp()
-        return
+    def update_one_status(self, data):
+        if 'worker_name' not in data:
+            return {'msg': 'Illegal data'}
+        worker_name = data['worker_name']
+        for worker in self.worker_list:
+            if worker_name == worker.name:
+                worker.is_busy = data['status'] == 1
+                worker.last_alive = dt.now().timestamp()
+                worker.device_info = data['gpu-status']
+                return {'msg': 'I hire u.'}
+    
+    def get_worker_status(self):
+        return [{
+
+        }]

@@ -23,6 +23,18 @@ class TaskServices():
     
     def heartbeat(self, data):
         return self.td.heartbeat(data)
+    
+    def add_one_task(self, data):
+        return self.td.add_one_task(data)
+    
+    def get_task_queue(self):
+        return [{
+            'token': t.token,
+            'username': t.username,
+            'tag': t.tag,
+            'timestamp': t.timestamp,
+            'filename': t.filename
+        } for t in self.td.task_queue.queue]
 
 
 # class TaskScheduler():

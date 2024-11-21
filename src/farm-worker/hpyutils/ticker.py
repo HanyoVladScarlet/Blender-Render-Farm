@@ -1,5 +1,5 @@
 from threading import Thread, Lock
-from utils.singleton import Singleton
+from hpyutils.singleton import Singleton
 from time import sleep, time_ns
 
 
@@ -14,7 +14,7 @@ class Ticker():
         self.pause = False
         self.fps = 64
         self.registered_instances = []
-        self.main_thread = Thread(target=self.tick, name='TickerMainThread', daemon=True)
+        self.main_thread = Thread(target=self.tick, name='ticker-main-thread', daemon=True)
         self.main_thread.start()
 
     def register(self, target):

@@ -11,14 +11,15 @@ class WorkerServices():
         '''
         Update the status to union to check for whether it is alive.
         '''
-        if 'worker_name' in data.keys() and 'worker_status' in data.keys():
+        if 'worker_name' in data and 'status' in data:
             self.wu.update_one_status(data['worker_name'], data['work_status'])
         return
+    
     def post_register_worker(self, data):
         '''
         Param data is a dict.
         '''
         return self.wu.add_one_worker(data)
-
-    def get_task(self, worker_name):
-        return self.wu.get_one_task(worker_name)
+    
+    def heartbeat(self, data):
+        return self.wu.update_one_status(data)

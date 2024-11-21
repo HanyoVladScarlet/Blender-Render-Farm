@@ -9,10 +9,8 @@ class FileServices():
         pass
         
 
-    def get_file(self, name='test'):
-        res = 'blender_files/assets/for_test.blend'
-        if name != 'test':
-            res = name
+    def get_file(self, user_name, tag_name, file_name='blend.zip'):
+        res = f'blender_files/{user_name}/{tag_name}/{file_name}'
         return res 
     
     def upload_file(self, user, tag, file):

@@ -2,22 +2,36 @@ from queue import Queue
 from datetime import datetime as dt
 from threading import Lock
 from models.render_task import RenderTask
+from uuid import uuid4 as uuid
+from repositories.worker_repository import WorkerUnion
+from utils.ticker import Ticker
+from utils.singleton import Singleton
 # from models.render_worker import RenderWorker
 
 
+@Singleton
 class TaskDispatcher():
     def __init__(self, max_count=512):
         self.lock = Lock()
         self.task_name = None
         self.status = {}
+        self.wu = WorkerUnion()
+
         # Make this pool a queue.
         # Dequeue only when a task is submitted sucessfully.
         self.task_queue = Queue(maxsize=max_count) 
         self.task_pool = {}
 
+        Ticker().register(self)
         # This is for test.
         for i in range(300):
-            self.task_queue.put(RenderTask().set_token(f'task_{i}'))
+            new_task = RenderTask()
+            new_task.token = str(uuid())
+            new_task.username = 'anonymous'
+            new_task.tag = 'demo-tag'
+            new_task.timestamp = dt.now().timestamp()
+            new_task.filename = 'for_test.blend'
+            self.task_queue.put(new_task)
         
 
     def any_available_task(self):
@@ -25,6 +39,24 @@ class TaskDispatcher():
         True if there are any tasks in task queue.
         '''
         return self.task_queue.qsize() > 0
+
+
+    def tick(self):
+        to_be_poped = []
+        with self.lock:
+            for worker_name in self.task_pool:
+                if not self.wu.is_worker_alive(worker_name):
+                    to_be_poped.append(worker_name)
+            for w in to_be_poped:
+                self.requeue(worker_name)
+                
+
+    def requeue(self, worker_name):
+        if worker_name in self.task_pool:
+            task = self.task_pool.pop(worker_name)
+            task_item = task['task']
+            self.task_queue.put(task_item)
+            print(f'Task {task_item.token} has returned to task queue.')
 
 
     def add_one_task(self, data):
@@ -37,67 +69,48 @@ class TaskDispatcher():
         Blender output settings.
         '''
         new_task = RenderTask()
+        new_task.token = str(uuid())
+        new_task.username = data['username']
+        new_task.tag = data['tag']
+        new_task.timestamp = dt.now().timestamp()
+        new_task.filename = data['filename']
+        
         with self.lock:
             self.task_queue.put(new_task)
 
 
     def get_one_task(self, worker_name):
+        print(self.task_pool)
         # Dispatch a task to caller. 
         if self.task_queue.qsize() == 0:
-            return 'No task available!' 
+            return  {'code': 1, 'task': None}
+        
+        # Repeat request before last task finishes.
+        # Status code -1 means in process.
+        if worker_name in self.task_pool:
+            return {'code': 2, 'task': self.task_pool[worker_name]['task']}
+            
         with self.lock:
             task = self.task_queue.get()
-            print()
-            print(self.task_pool.keys())
-
-            # Repeat request before last task finishes.
-            # Status code -1 means in process.
-            if worker_name in self.task_pool.keys():
-                pooled_task = self.task_pool[worker_name]
-                if pooled_task['status'] == -1:
-                    return 'Task already assigned!'
-                
             self.task_pool[worker_name] = {
                 'task': task,
                 'status': -1,
                 'last_alive': dt.now().timestamp(),
             }
-            res = RenderTask().set_token(task.token)
-
-            return res
-
-
-    def heartbeat(self, data):
-        '''
-        + If too long from last report, abort the task and re-enqueue it into task queue.
-        + When hearing the heartbeat from a worker for the first time, there shall be a request to collect device information in the response.
-        '''
-        # if data['code'] == 0:
-        #     self.sheep_pool[token].available = True       
-        if 'worker_name' not in data.keys() or data['worker_name'] not in self.task_pool:
-            print(f'Illegal worker {data["worker_name"]}!')
-        if 'status' in data.keys():
-            # print(f'Worker {data["worker_name"]} is at {data["status"]}')
-            worker_name = data['worker_name']
-
-            if worker_name not in self.workers.keys():
-                print(worker_name)
-                self.workers[worker_name] = {
-                    'ip_addr': data['ip_addr'],
-                    'last_alive': dt.now().timestamp()
-                }
+            print(self.task_pool)
+            return {'code': 0, 'task': task}
 
 
     def submit_one_task(self, data):
         # Enqueue to task pool for reassignment if failed to validate by metadata.
+        # TODO: How to validate whether task is completed is to be decided.
         with self.lock:
-            if 'worker_name' not in data.keys():
+            if 'worker_name' not in data:
                 return 'Illegal data!'
             worker_name = data['worker_name']
-            print(self.task_pool.keys())
-            if not data or 'res' not in data.keys() or data['res'] != 'finished':
-                with self.lock:
-                    self.task_queue.put(pooled_task)
+            print(self.task_pool)
+            if not data or 'code' not in data or data['code'] != 0:
+                self.requeue(worker_name)
                 print('Task quit with unexpected error!')
             pooled_task = self.task_pool.pop(worker_name)
             print(f'pooled task: {pooled_task}')
