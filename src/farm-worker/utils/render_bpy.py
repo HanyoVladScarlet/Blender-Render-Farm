@@ -4,7 +4,8 @@ from importlib import import_module
 import bpy
 from requests import get
 from hashlib import md5 
-from zipfile import ZipFile
+import zipfile 
+import pathlib
 
 
 class RenderTask():
@@ -23,27 +24,35 @@ class BpyScriptor():
         '''
         It is agreed that the downloaded files are structured as demanded, referring to Readme.md
         '''
-        try: 
-            # 1. Check if there is an existed file share the same md5 code with the file to be downloaded.
-            with open('blend.zip', 'wb') as f:
-                f.write(response.content)
-                md5_res = md5(f.read()).hexdigest()
-                if md5_res == d_md5:
+        # try: 
+        # 1. Check if there is an existed file share the same md5 codewith the file to be downloaded.
+        if os.path.exists('blend.zip'):
+            f = open('blend.zip', 'rb')
+            md5_res = md5(f.read()).hexdigest()
+            f.close()
+            if md5_res != d_md5:
+                with open('blend.zip', 'wb') as f:
                     response = get(d_link)
-                # By Microsoft Copilot.
-                if unzip:
-                    os.makedirs('blend', exist_ok=True)
-                    with ZipFile('blend.zip', 'r') as f:
-                        f.extractall('blend')
-            print('Unzip successfully.')
-            module_name = 'blend.main'
-            blend_main = import_module(module_name)
-            curdir = os.curdir
-            os.chdir('blend')
-            blend_main.main()
-            os.chdir(curdir)
-        except Exception as e:
-            print(e)
+                    f.write(response.content)
+
+        # By Microsoft Copilot.
+        os.makedirs('blend', exist_ok=True)
+        with zipfile.ZipFile('blend.zip', 'r') as f:
+                    f.extractall('blend')
+        print('Unzip successfully.')
+        module_name = 'blend.main'
+        blend_main = import_module(module_name)
+        curdir = pathlib.Path(os.curdir).absolute()
+        os.chdir('blend')
+        blend_main.main()
+        os.chdir(curdir)
+        if not os.path.exists('blend'):
+            os.makedirs('blend')
+        # print(f"buxuhao{os.path.abspath('blend/outputs')}")
+        zip_folder('blend/outputs', 'blend/outputs.zip')
+        # except Exception as e:
+        #     print(e)
+
 
     def render_single(self, d_link, md5_code):
         '''
@@ -79,6 +88,15 @@ class BpyScriptor():
         bpy.context.scene.cycles.device = 'GPU'
         # Make this adaptive.
         print(bpy.context.preferences.addons['cycles'].preferences.compute_device_type)
+
+
+# By Microsoft Copilot.
+def zip_folder(folder_path, output_path):
+    with zipfile.ZipFile(output_path, 'w', zipfile. ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                zipf.write(file_path, os.path.relpath(file_path, folder_path))
 
 
 if __name__ == '__main__':

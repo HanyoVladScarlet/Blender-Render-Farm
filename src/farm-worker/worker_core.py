@@ -7,7 +7,7 @@ from hpyutils.ticker import Ticker
 from hpyutils.singleton import Singleton
 from utils.render_bpy import RenderTask, BpyScriptor
 
-from json import loads
+import json
 from hashlib import md5 
 
 from GPUtil import getGPUs
@@ -47,10 +47,20 @@ class MetaBehavior():
         '''
         print('Work, work~')
         while True:
+            print(f'self.status: {self.status}')
+            code = 0
             if self.status == 0:
-                self.get_one_task()
+                code = self.get_one_task()
             if self.status == 1:
-                self.submit_one_task()
+                data = {
+                    'worker_name': self.worker_name,
+                    'code': code,
+                    'username': self.username,
+                    'token': self.current_task.token,
+                    'tag': self.current_task.tag,
+                    'with_bpy': self.current_task.with_bpy
+                }
+                self.submit_one_task(data)
             sleep(self.interval)
         
 
@@ -77,8 +87,8 @@ class MetaBehavior():
     def get_one_task(self):
         url = f'http://{self.host}:{self.port}/api/get-one-task/{self.worker_name}'
         res = get(url)
-        data = loads(res.content)
-        print(data)
+        print(res.content)
+        data = json.loads(res.content)
         # If interrupted and restarted, submit the last task as failed.
         if 'code' in data and 'with_bpy' in data:
             if data['code'] == 2:
@@ -87,11 +97,18 @@ class MetaBehavior():
             if data['code'] == 0:
                 with self.lock:
                     self.status = 1
+                self.current_task = RenderTask()
+                self.current_task.token = data['token']
+                self.current_task.tag = data['tag']
+                self.current_task.with_bpy = data['with_bpy']
+                self.current_task.md5_code = data['d_md5']
+
                 if data['with_bpy']:
-                    self.render.run_bpy(data['d_link'], data['d_md5'])
+                    d_link = f'http://{self.host}:{self.port}{data["d_link"]}'
+                    self.render.run_bpy(d_link, data['d_md5'])
                 else:
-                    self.render.render_single(data['d_link'], data['d_md5'])
-        return 
+                    self.render.render_single(d_link, data['d_md5'])
+        return 0
 
 
     def submit_one_task(self, data):
@@ -105,14 +122,21 @@ class MetaBehavior():
         if 'code' in data and data['code'] == 0:
             # Upload file first.
             if 'with_bpy' in data:
-                file = None
-                if data['with_bpy']:
-                    file = open('blend/outputs.zip')
-                else:
-                    file = open('output.png')
-                post(url, files={'file': file})
+                file_name = 'blend/outputs.zip' if data['with_bpy'] else 'output.png'
+                file = open(file_name, 'rb')
+                files = [
+                    ('file',(file_name, file,'application/octet')),
+                    ('data',('data', json.dumps(data),'application/json')),
+                ]
+                response = post(url, files=files)
+                res = json.loads(response.content)
+                print(res)
+                if 'code' in res and res['code'] == 0:
+                    print('Submit successfully.')
+                    self.status = 0
             # Post finish then (reuse available).
-        post(url, json=data)
+        # url = f'http://{self.host}:{self.port}/api/submit'
+        # post(url, json=data)
         return
 
     

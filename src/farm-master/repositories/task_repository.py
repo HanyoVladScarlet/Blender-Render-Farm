@@ -1,11 +1,11 @@
-from queue import Queue
 from datetime import datetime as dt
-from threading import Lock
 from models.render_task import RenderTask
-from uuid import uuid4 as uuid
+from queue import Queue
 from repositories.worker_repository import WorkerUnion
+from threading import Lock
 from utils.ticker import Ticker
 from utils.singleton import Singleton
+from uuid import uuid4 as uuid
 # from models.render_worker import RenderWorker
 
 
@@ -23,6 +23,8 @@ class TaskDispatcher():
         self.task_pool = {}
 
         Ticker().register(self)
+
+        '''
         # This is for test.
         for i in range(300):
             new_task = RenderTask()
@@ -32,7 +34,8 @@ class TaskDispatcher():
             new_task.timestamp = dt.now().timestamp()
             new_task.filename = 'for_test.blend'
             self.task_queue.put(new_task)
-        
+        '''
+     
 
     def any_available_task(self):
         '''
@@ -73,10 +76,13 @@ class TaskDispatcher():
         new_task.username = data['username']
         new_task.tag = data['tag']
         new_task.timestamp = dt.now().timestamp()
-        new_task.filename = data['filename']
+        new_task.with_bpy = data['with_bpy']
+        new_task.blender = data['blender'] 
         
         with self.lock:
             self.task_queue.put(new_task)
+        
+        return
 
 
     def get_one_task(self, worker_name):
@@ -106,7 +112,8 @@ class TaskDispatcher():
         # TODO: How to validate whether task is completed is to be decided.
         with self.lock:
             if 'worker_name' not in data:
-                return 'Illegal data!'
+                print('Illegal data!')
+                return {'code': 1}
             worker_name = data['worker_name']
             print(self.task_pool)
             if not data or 'code' not in data or data['code'] != 0:
@@ -115,4 +122,5 @@ class TaskDispatcher():
             pooled_task = self.task_pool.pop(worker_name)
             print(f'pooled task: {pooled_task}')
             worker_name = data['worker_name']
-            return 'Submit successfully.'
+            print('Submit successfully.')
+            return {'code': 0}

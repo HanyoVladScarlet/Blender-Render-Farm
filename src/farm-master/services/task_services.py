@@ -32,8 +32,7 @@ class TaskServices():
             'token': t.token,
             'username': t.username,
             'tag': t.tag,
-            'timestamp': t.timestamp,
-            'filename': t.filename
+            'timestamp': t.timestamp
         } for t in self.td.task_queue.queue]
 
 

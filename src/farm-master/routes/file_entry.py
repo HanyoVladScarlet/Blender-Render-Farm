@@ -31,3 +31,14 @@ def get_addons(file_name):
     except:
         # abort('404')
         return 'Addon not found!'
+    
+
+@file_entry.route('/downloads/<user_name>/<tag_name>', methods=['GET'])
+def get_files(user_name, tag_name):
+    try:
+        f_path = fs.get_file(user_name, tag_name)
+        return send_file(f_path)
+    except Exception as e:
+        # abort('404')
+        print(e)
+        return 'Asset not found!'
